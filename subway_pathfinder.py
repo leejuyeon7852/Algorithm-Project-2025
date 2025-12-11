@@ -148,7 +148,7 @@ while True:
         break
 
     if not station_exists(end):
-        print(f"\n⚠️ '{end}' 은(는) 존재하지 않는 역입니다. 다시 입력해주세요!\n")
+        print(f"\n '{end}' 은(는) 존재하지 않는 역입니다. 다시 입력해주세요!\n")
         continue
 
     # ---------------------------
@@ -157,12 +157,12 @@ while True:
     path, total = find_best_path(G, start, end, weight="time")
 
     if path is None:
-        print("\n⚠️ 해당 역들 사이에 경로가 존재하지 않습니다.\n")
+        print("\n 해당 역들 사이에 경로가 존재하지 않습니다.\n")
         continue
 
     print("\n=== ✅ 최단경로 (시간 기준) ===")
     print(pretty(path))
-    print(f"\n총 소요시간: {total:.2f} 분\n")
+    #print(f"\n총 소요시간: {total:.2f} 분\n")
 
     # ---------------------------
     # 그래프 시각화
