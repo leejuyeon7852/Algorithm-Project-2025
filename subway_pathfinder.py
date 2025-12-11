@@ -1,81 +1,160 @@
-from turtle import distance
 import pandas as pd
 import matplotlib.pyplot as plt
-import matplotlib.font_manager as fm
 import networkx as nx
-
-# csv 불러오기
-df = pd.read_csv("서울교통공사 역간거리 및 소요시간_240810.csv")
-
-# 시간 문자열 -> 분 단위로 변환 함수
-def time_to_minutes(t):
-    mm, ss = t.split(":")
-    return int(mm) + int(ss) / 60
-
-df["time_min"] = df["소요시간"].apply(time_to_minutes)
-
-# 그래프 생성
-G = nx.Graph()
-
-# 호선별 정렬 후, 이웃역끼리 edge 생성
-for line, group in df.groupby("호선"):
-    group = group.sort_values("연번")
-
-    for i in range(len(group)-1):
-        s1 = group.iloc[i]["역명"]
-        s2 = group.iloc[i + 1]["역명"]
-        dist = group.iloc[i + 1]["역간거리(km)"]
-        tmin = group.iloc[i + 1]["time_min"]
-
-        # 거리, 시간 저장
-        G.add_edge(s1, s2, distance=dist, time=tmin)
-
-# 다익스트라 최단경로
-def shortest_path(graph, start, end, weight_type="distance"):
-    path = nx.dijkstra_path(graph, start, end, weight=weight_type)
-    total = nx.dijkstra_path_length(graph, start, end, weight=weight_type)
-    return path, total
-
-# 테스트
-start = "강남"
-end = "시청"
-
-path, total = shortest_path(G, start, end, weight_type="distance")
 
 plt.rcParams['font.family'] = 'Malgun Gothic'
 plt.rcParams['axes.unicode_minus'] = False
 
-plt.figure(figsize=(14, 12))
+# ------------------------------------------
+# 1) CSV 로드
+# ------------------------------------------
+base = pd.read_csv("서울교통공사 역간거리 및 소요시간_240810.csv")
+trans = pd.read_csv("서울교통공사_환승역거리 소요시간 정보_20250331.csv")
 
-pos = nx.spring_layout(G, seed=42)  # 레이아웃 동일하게 유지
+def time_to_min(t):
+    mm, ss = t.split(":")
+    return int(mm) + int(ss) / 60
 
-# 전체 그래프 
-nx.draw_networkx_nodes(G, pos, node_size=10, node_color="lightgray", alpha=0.2)
-nx.draw_networkx_edges(G, pos, width=0.3, edge_color="gray", alpha=0.2)
+base["time_min"] = base["소요시간"].apply(time_to_min)
 
-nx.draw_networkx_labels(
-    G, pos,
-    font_size=5,                  
-    font_family='Malgun Gothic',
-    font_color="gray",
-    bbox=dict(facecolor='white', edgecolor='none', alpha=0.4)
-)
+# 호선 이름 통일 
+trans["호선"] = trans["호선"].astype(str).str.replace("호선", "")
+trans["환승노선"] = trans["환승노선"].astype(str).str.replace("호선", "")
 
-# 최단경로 강조 
+trans["time_min"] = trans["환승소요시간"].apply(time_to_min)
+trans["distance_km"] = trans["환승거리"] / 1000
+
+# ------------------------------------------
+# 2) 그래프 생성 (노드 = 역명(호선))
+# ------------------------------------------
+G = nx.Graph()
+
+for line, group in base.groupby("호선"):
+    group = group.sort_values("연번")
+
+    for i in range(len(group) - 1):
+        node1 = f"{group.iloc[i]['역명']}({line})"
+        node2 = f"{group.iloc[i+1]['역명']}({line})"
+
+        dist = group.iloc[i+1]["역간거리(km)"]
+        tmin = group.iloc[i+1]["time_min"]
+
+        G.add_edge(node1, node2, distance=dist, time=tmin, type="move")
+
+# ------------------------------------------
+# 3) 환승 간선 추가
+# ------------------------------------------
+for _, row in trans.iterrows():
+    s = row["환승역명"]
+    lineA = row["호선"]
+    lineB = row["환승노선"]
+
+    nodeA = f"{s}({lineA})"
+    nodeB = f"{s}({lineB})"
+
+    # 환승 연결 추가
+    G.add_edge(
+        nodeA, nodeB,
+        distance=row["distance_km"],
+        time=row["time_min"],
+        type="transfer"
+    )
+
+# ------------------------------------------
+# 4) 여러 노드 찾기 (출발/도착 후보 모두 찾기)
+# ------------------------------------------
+def find_all_nodes(name):
+    return [n for n in G.nodes() if n.startswith(f"{name}(")]
+
+# ------------------------------------------
+# 5) 최단경로 계산 (모든 후보 중 최소값 선택)
+# ------------------------------------------
+def find_best_path(graph, start_name, end_name, weight="time"):
+
+    start_nodes = find_all_nodes(start_name)
+    end_nodes = find_all_nodes(end_name)
+
+    best_path = None
+    best_cost = float("inf")
+
+    for s in start_nodes:
+        for e in end_nodes:
+            try:
+                path = nx.dijkstra_path(graph, s, e, weight=weight)
+                cost = nx.dijkstra_path_length(graph, s, e, weight=weight)
+
+                if cost < best_cost:
+                    best_cost = cost
+                    best_path = path
+
+            except nx.NetworkXNoPath:
+                continue
+
+    return best_path, best_cost
+
+
+# ------------------------------------------
+# 6) 출력 포맷
+# ------------------------------------------
+def clean(n):
+    return n.split("(")[0]
+
+def line_of(n):
+    return n.split("(")[1].replace(")", "")
+
+def pretty(path):
+    out = []
+    for i in range(len(path)):
+        out.append(f"{clean(path[i])}({line_of(path[i])})")
+
+        if i < len(path) - 1 and clean(path[i]) == clean(path[i+1]):
+            out.append(" ↳ [환승]")
+    return "\n → ".join(out)
+
+# ------------------------------------------
+# 7) 실행
+# ------------------------------------------
+start = "잠실"
+end = "월곡"
+
+path, total = find_best_path(G, start, end, weight="time")
+
+print("=== 최단경로 (시간 기준) ===")
+print(pretty(path))
+#print(f"\n총 소요시간: {total:.2f} 분")
+
+# ------------------------------------------
+# 8) 시각화
+# ------------------------------------------
+pos = nx.spring_layout(G, seed=42)
+
+plt.figure(figsize=(18, 15))
+
+nx.draw_networkx_nodes(G, pos, node_size=6, node_color="gray", alpha=0.15)
+nx.draw_networkx_edges(G, pos, width=0.3, edge_color="gray", alpha=0.15)
+
 path_edges = list(zip(path, path[1:]))
 
 nx.draw_networkx_nodes(G, pos, nodelist=path, node_size=200, node_color="red")
 nx.draw_networkx_edges(G, pos, edgelist=path_edges, width=4, edge_color="red")
 
-labels = {node: node for node in path}
 nx.draw_networkx_labels(
-    G, pos, labels=labels,
-    font_size=10,
+    G, pos,
+    font_size=4,
     font_family='Malgun Gothic',
-    font_color="black",
-    bbox=dict(facecolor='white', edgecolor='red', boxstyle="round,pad=0.2", alpha=0.9)
+    font_color="gray",
+    alpha=0.6
 )
 
-plt.title(f"{start} → {end} 최단경로 (거리 기준)", fontsize=16)
+nx.draw_networkx_labels(
+    G, pos,
+    labels={n: clean(n) for n in path},
+    font_family='Malgun Gothic',
+    font_size=12,
+    font_color="black",
+    bbox=dict(facecolor='white', edgecolor='red', alpha=0.9)
+)
+
+plt.title(f"{start} → {end} 최단경로 (시간 기준, 환승 포함)")
 plt.axis("off")
 plt.show()
