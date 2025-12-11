@@ -112,49 +112,87 @@ def pretty(path):
     return "\n → ".join(out)
 
 # ------------------------------------------
-# 7) 실행
+# 7) 사용자 입력 + 반복문 + 에러 처리 + 종료 옵션
 # ------------------------------------------
-start = "잠실"
-end = "월곡"
 
-path, total = find_best_path(G, start, end, weight="time")
+def station_exists(name):
+    """입력한 역 이름이 G의 노드 중 하나라도 포함하는지 체크"""
+    for n in G.nodes():
+        if n.startswith(f"{name}("):
+            return True
+    return False
 
-print("=== 최단경로 (시간 기준) ===")
-print(pretty(path))
-#print(f"\n총 소요시간: {total:.2f} 분")
 
-# ------------------------------------------
-# 8) 시각화
-# ------------------------------------------
-pos = nx.spring_layout(G, seed=42)
+while True:
+    print("\n===== 서울 지하철 최단경로 조회 시스템 =====")
+    print("종료하려면 -1 을 입력하세요.\n")
 
-plt.figure(figsize=(18, 15))
+    # ---------------------------
+    # 출발역 입력
+    # ---------------------------
+    start = input("출발역 입력: ").strip()
+    if start == "-1":
+        print("\n프로그램을 종료합니다.")
+        break
 
-nx.draw_networkx_nodes(G, pos, node_size=6, node_color="gray", alpha=0.15)
-nx.draw_networkx_edges(G, pos, width=0.3, edge_color="gray", alpha=0.15)
+    if not station_exists(start):
+        print(f"\n⚠️ '{start}' 은(는) 존재하지 않는 역입니다. 다시 입력해주세요!\n")
+        continue
 
-path_edges = list(zip(path, path[1:]))
+    # ---------------------------
+    # 도착역 입력
+    # ---------------------------
+    end = input("도착역 입력: ").strip()
+    if end == "-1":
+        print("\n프로그램을 종료합니다.")
+        break
 
-nx.draw_networkx_nodes(G, pos, nodelist=path, node_size=200, node_color="red")
-nx.draw_networkx_edges(G, pos, edgelist=path_edges, width=4, edge_color="red")
+    if not station_exists(end):
+        print(f"\n⚠️ '{end}' 은(는) 존재하지 않는 역입니다. 다시 입력해주세요!\n")
+        continue
 
-nx.draw_networkx_labels(
-    G, pos,
-    font_size=4,
-    font_family='Malgun Gothic',
-    font_color="gray",
-    alpha=0.6
-)
+    # ---------------------------
+    # 최단경로 계산
+    # ---------------------------
+    path, total = find_best_path(G, start, end, weight="time")
 
-nx.draw_networkx_labels(
-    G, pos,
-    labels={n: clean(n) for n in path},
-    font_family='Malgun Gothic',
-    font_size=12,
-    font_color="black",
-    bbox=dict(facecolor='white', edgecolor='red', alpha=0.9)
-)
+    if path is None:
+        print("\n⚠️ 해당 역들 사이에 경로가 존재하지 않습니다.\n")
+        continue
 
-plt.title(f"{start} → {end} 최단경로 (시간 기준, 환승 포함)")
-plt.axis("off")
-plt.show()
+    print("\n=== ✅ 최단경로 (시간 기준) ===")
+    print(pretty(path))
+    print(f"\n총 소요시간: {total:.2f} 분\n")
+
+    # ---------------------------
+    # 그래프 시각화
+    # ---------------------------
+    pos = nx.spring_layout(G, seed=42)
+
+    plt.figure(figsize=(18, 15))
+    nx.draw_networkx_nodes(G, pos, node_size=6, node_color="gray", alpha=0.15)
+    nx.draw_networkx_edges(G, pos, width=0.3, edge_color="gray", alpha=0.15)
+
+    path_edges = list(zip(path, path[1:]))
+    nx.draw_networkx_nodes(G, pos, nodelist=path, node_size=200, node_color="red")
+    nx.draw_networkx_edges(G, pos, edgelist=path_edges, width=4, edge_color="red")
+
+    nx.draw_networkx_labels(
+        G, pos,
+        font_size=4,
+        font_family='Malgun Gothic',
+        font_color="gray",
+        alpha=0.6
+    )
+    nx.draw_networkx_labels(
+        G, pos,
+        labels={n: clean(n) for n in path},
+        font_family='Malgun Gothic',
+        font_size=12,
+        font_color="black",
+        bbox=dict(facecolor='white', edgecolor='red', alpha=0.9)
+    )
+
+    plt.title(f"{start} → {end} 최단경로 (시간 기준, 환승 포함)")
+    plt.axis("off")
+    plt.show()
