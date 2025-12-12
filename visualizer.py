@@ -30,3 +30,10 @@ def draw_path(G, path, title):
     plt.title(title, fontfamily='Malgun Gothic')
     plt.axis("off")
     plt.show()
+
+def draw_performance(results, start, end):
+    plt.figure(figsize=(6, 4))
+    plt.bar(results.keys(), results.values(), color=["blue", "green"])
+    plt.ylabel("실행 시간 (초)")
+    plt.title(f"{start} → {end} 알고리즘 성능 비교", fontfamily='Malgun Gothic')
+    plt.show()
