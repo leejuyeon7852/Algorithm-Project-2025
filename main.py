@@ -11,7 +11,18 @@ G = load_graph(
 
 while True:
     print("\n===== 서울 지하철 경로 탐색 시스템 =====")
+    print("1. 최단 시간 경로")
+    print("2. 붐비지 않는 경로(혼잡도 기반)")
     print("-1. 종료")
+
+    mode_select = input("모드를 선택하세요: ").strip()
+    if mode_select == "-1":
+        break
+    if mode_select not in ["1", "2"]:
+        print("잘못된 선택!")
+        continue
+
+    mode = "normal" if mode_select == "1" else "low_congestion"  
 
     # 출발
     start = input("출발역 입력: ").strip()
@@ -33,7 +44,7 @@ while True:
         print(f"\n'{end}' 은(는) 존재하지 않는 역입니다. 다시 입력해주세요!\n")
         continue
 
-    path, total_cost = dijkstra(G, start, end)    
+    path, total_cost = dijkstra(G, start, end, mode=mode)
 
     if path is None:
         print("\n해당 역들 사이에 이동 가능한 경로가 없습니다.\n")
