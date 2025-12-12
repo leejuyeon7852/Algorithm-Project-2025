@@ -2,14 +2,52 @@ import networkx as nx
 from utils import is_transfer, find_all_nodes
 from congestion import get_congestion  
 import time
+import math
 
 # 환승 페널티
 TRANSFER_PENALTY = 10
 
+MAX_SPEED = 60
+
+station_pos = None
+
+def set_station_pos(pos):
+    global station_pos
+    station_pos = pos
+
+def haversine(lat1, lon1, lat2, lon2):
+    R = 6371  # km
+    phi1 = math.radians(lat1)
+    phi2 = math.radians(lat2)
+    dphi = math.radians(lat2 - lat1)
+    dlambda = math.radians(lon2 - lon1)
+
+    a = math.sin(dphi / 2) ** 2 + \
+        math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2) ** 2
+
+    return 2 * R * math.asin(math.sqrt(a))  # km
+
+def pure_station(node):
+    return node.split("(")[0]
+
 def heuristic(a, b):
-    # edge distance 사용한 단순 휴리스틱
-    # 실제로는 더 정교할 수 있지만 지금 그래프 구조에서는 충분함
-    return 1  # 기본값 (네트워크 구조 때문에 너무 세게 주면 경로 꼬임)
+    if station_pos is None:
+        return 0
+
+    sa = pure_station(a)               
+    sb = pure_station(b)              
+
+    if sa not in station_pos or sb not in station_pos:
+        return 0
+
+    lat1, lon1 = station_pos[sa]
+    lat2, lon2 = station_pos[sb]
+
+    dist_km = haversine(lat1, lon1, lat2, lon2)
+
+    # 거리 → 시간(분)
+    return (dist_km / MAX_SPEED) * 60
+
 
 def dijkstra(G, start, end, mode="normal"):  
     best_path = None
@@ -70,8 +108,11 @@ def astar(G, start, end, mode="normal"):
                     return base + penalty
 
                 # A* 경로 계산
-                path = nx.astar_path(G, s, e, weight=weight,
-                                     heuristic=lambda u, v: heuristic(u, v))
+                path = nx.astar_path(
+                    G, s, e, 
+                    weight=weight,
+                    heuristic=lambda u, v: heuristic(u, v)
+                )
 
                 # 비용 계산 
                 total_cost = sum(
@@ -89,17 +130,23 @@ def astar(G, start, end, mode="normal"):
     return best_path, best_cost
 
 # 시간 비교 
-def compare_times(G, start, end): 
+def compare_times(G, start, end, repeat=20):
     results = {}
 
     # 다익스트라
-    t0 = time.time()
-    dijkstra(G, start, end)
-    results["Dijkstra"] = time.time() - t0
+    total = 0
+    for _ in range(repeat):
+        t0 = time.perf_counter()        
+        dijkstra(G, start, end)
+        total += time.perf_counter() - t0
+    results["Dijkstra"] = total / repeat
 
     # A*
-    t0 = time.time()
-    astar(G, start, end)
-    results["A*"] = time.time() - t0
+    total = 0
+    for _ in range(repeat):
+        t0 = time.perf_counter()        
+        astar(G, start, end)
+        total += time.perf_counter() - t0
+    results["A*"] = total / repeat
 
-    return results  
+    return results

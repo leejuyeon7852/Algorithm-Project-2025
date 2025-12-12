@@ -1,5 +1,5 @@
-from data_loader import load_graph
-from algorithms import dijkstra, astar
+from data_loader import load_graph, load_station_pos
+from algorithms import dijkstra, astar, set_station_pos
 from utils import station_exists, pretty
 from visualizer import draw_path
 
@@ -8,6 +8,11 @@ G = load_graph(
     "서울교통공사 역간거리 및 소요시간_240810.csv",
     "서울교통공사_환승역거리 소요시간 정보_20250331.csv"
 )
+
+station_pos = load_station_pos(
+    "서울교통공사_1_8호선 역사 좌표(위경도) 정보_20250814.csv"
+)
+set_station_pos(station_pos)
 
 while True:
     print("\n===== 서울 지하철 경로 탐색 시스템 =====")

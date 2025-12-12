@@ -39,3 +39,15 @@ def load_graph(base_path, trans_path):
                    type="transfer")
 
     return G
+
+def load_station_pos(station_csv_path):
+    df = pd.read_csv(station_csv_path)
+
+    station_pos = {}
+    for _, row in df.iterrows():
+        name = row["역명"].strip()
+        lat = float(row["위도"])
+        lon = float(row["경도"])
+        station_pos[name] = (lat, lon)
+
+    return station_pos

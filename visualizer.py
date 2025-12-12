@@ -2,6 +2,9 @@ import matplotlib.pyplot as plt
 import networkx as nx
 from utils import clean
 
+plt.rcParams['font.family'] = 'Malgun Gothic'
+plt.rcParams['axes.unicode_minus'] = False
+
 def draw_path(G, path, title):
     pos = nx.spring_layout(G, seed=42)
 
